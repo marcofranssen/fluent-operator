@@ -77,6 +77,12 @@ jobs:
       - name: Run verify crds test
         run:  make verify
 
+      - name: Run build
+        run: make build
+
+      - name: Ensure all generated code is committed
+        run: git diff --exit-code
+
   e2e_tests:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
