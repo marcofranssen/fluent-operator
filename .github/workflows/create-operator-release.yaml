@@ -1,0 +1,120 @@
+name: Create Operator Release Pull Request
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New version number (e.g., v3.4.0)'
+        required: true
+        type: string
+
+jobs:
+  release-pr:
+    name: Create Operator Release Pull Request
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate version format
+        run: |
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version format. Please use vX.Y.Z"
+            exit 1
+          fi
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+
+      - name: Set branch name
+        id: set-branch
+        run: |
+          VERSION_WITHOUT_V="${VERSION#v}"
+          if [[ "$VERSION_WITHOUT_V" =~ ^([0-9]+\.[0-9]+)\.0$ ]]; then
+            # If version ends with .0, use X.Y format
+            BRANCH="release-${BASH_REMATCH[1]}"
+          else
+            # Otherwise use full X.Y.Z format
+            BRANCH="release-${VERSION_WITHOUT_V}"
+          fi
+          echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+      - name: Create target release branch
+        run: |
+          git checkout -b "$BRANCH"
+          git push --set-upstream origin "$BRANCH"
+        env:
+          BRANCH: ${{ steps.set-branch.outputs.branch }}
+
+      - name: Create work branch
+        run: |
+          git checkout -b "$BRANCH"
+          git push --set-upstream origin "$BRANCH"
+        env:
+          BRANCH: ${{ steps.set-branch.outputs.branch }}-work
+
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ steps.set-branch.outputs.branch }}-work
+
+      - name: Update manifest files
+        run: |
+          # Update deployment manifests
+          files=(
+            "manifests/setup/fluent-operator-deployment.yaml"
+            "manifests/setup/setup.yaml"
+          )
+          for file in "${files[@]}"; do
+            if [ -f "$file" ]; then
+              sed -i 's/fluent-operator:latest/fluent-operator:${VERSION}/' "$file"
+            else
+              echo "Warning: File $file not found"
+              exit 1
+            fi
+          done
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+
+      - name: Update Helm chart values
+        run: |
+          sed -i 's/appVersion: .*$/appVersion: '"$VERSION"'/' charts/fluent-operator/Chart.yaml
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+
+      - name: Update VERSION file
+        run: echo "$VERSION" > VERSION
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
+        with:
+          commit-message: "Bump version to ${{ github.event.inputs.version }}"
+          signoff: true
+          title: "Release ${{ github.event.inputs.version }}"
+          body: |
+            ## Release ${{ github.event.inputs.version }}
+
+            This PR updates version references for the `${{ github.event.inputs.version }}` release.
+
+            ### Changes
+
+            The following files have been updated:
+            - manifests/setup/fluent-operator-deployment.yaml
+            - manifests/setup/setup.yaml
+            - charts/fluent-operator/Chart.yaml
+            - VERSION
+
+            Please review the changes carefully before merging.
+          branch: ${{ steps.set-branch.outputs.branch }}-work
+          base: ${{ steps.set-branch.outputs.branch }}
+          labels: |
+            release

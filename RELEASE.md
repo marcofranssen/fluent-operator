@@ -83,44 +83,28 @@ Create a PR for the changes to be reviewed.
 For new minor and major releases, create the `release-<major>.<minor>` branch starting at the PR merge commit.
 From now on, all work happens on the `release-<major>.<minor>` branch.
 
-Bump the version in the `VERSION` file in the root of the repository.
+1. To create the release branch, run the following command:
 
-Regenerate setup.yaml based on latest code and then commit the changed bundle.yaml to the `release-<major>.<minor>` branch:
+   ```bash
+   tag=3.4.0
+   gh workflow run create-operator-release.yaml -f version="${tag}"
+   ```
 
-```bash
-make manifests
-git add ./
-git commit -s -m "regenerate setup.yaml"
-git push
-```
+2. Merge the created PR into the `release-<major>.<minor>` branch.
+3. Tag the new release with a tag named `v<major>.<minor>.<patch>`, e.g. `v2.1.3`. Note the `v` prefix.
 
-Images will be automatically built and pushed whenever code changes or a tag is created. If users want to build images manually, use the following command:
+   ```bash
+   tag="$(< VERSION)"
+   git tag -a "${tag}" -m "${tag}"
+   git push origin "${tag}"
+   ```
 
-```bash
-make build-op-amd64 -e FO_IMG=<image of fluent operator>
-docker push <image of fluent operator>
-make build-fb-amd64 -e FB_IMG=<image of fluent bit>
-docker push <image of fluent bit>
-make build-fd-amd64 -e FD_IMG=<image of fluentd>
-docker push <image of fluentd>
-```
+4. Finally, create a new release:
 
-Tag the new release with a tag named `v<major>.<minor>.<patch>`, e.g. `v2.1.3`. Note the `v` prefix. You can do the tagging on the commandline:
-
-```bash
-tag="$(< VERSION)"
-git tag -a "${tag}" -m "${tag}"
-git push origin "${tag}"
-```
-
-Commit all the changes.
-
-Finally, create a new release:
-
-- Go to https://github.com/fluent/fluent-operator/releases/new.
-- Associate the new release with the previously pushed tag.
-- Add release notes based on `CHANGELOG.md`.
-- Add file `setup.yaml` from `manifests/setup/setup.yaml` and then click "Publish release".
+   - Go to https://github.com/fluent/fluent-operator/releases/new.
+   - Associate the new release with the previously pushed tag.
+   - Add release notes based on `CHANGELOG.md`.
+   - Add file `setup.yaml` from `manifests/setup/setup.yaml` and then click "Publish release".
 
 For patch releases, cherry-pick the commits from the release branch into the master branch.
 
