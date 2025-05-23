@@ -100,7 +100,7 @@ Patch releases are created for bug fixes and minor improvements. They should not
 
     * Update the `version` field in the `Chart.yaml` file to the new version number.
     * Update the `appVersion` field in the `Chart.yaml` file to the new version number.
-    * Update the `CHANGELOG.md` file with a summary of changes since the last release.
+    * Update the `CHANGELOG.md` file with a summary of changes since the last release. (`make changelog`)
     * Update the `RELEASE.md` file with the new release date and shepherd information.
 
 ## FluentBit release process

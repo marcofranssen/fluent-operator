@@ -380,3 +380,20 @@ update-helm-package: # update helm repo
 helm-docs:
 	cd charts/fluentd-crds && helm-docs
 	cd charts/fluent-bit-crds && helm-docs
+
+##@ Release
+
+LAST_RELEASE_TAG := $(shell gh release list --limit 1 --json tagName --jq '.[0].tagName')
+LAST_RELEASE_DATE := $(shell gh release list --limit 1 --json publishedAt --jq '.[0].publishedAt')
+
+changelog: ## Generate a changelog since the last release
+	@echo
+	@echo "Previous release: $(LAST_RELEASE_TAG)"
+	@echo "Previous release date: $(LAST_RELEASE_DATE)"
+	@echo
+	@echo Copy following lines to the top of CHANGELOG.md and group the changes by type:
+	@echo
+	@MERGED_PRS=$$(gh pr list --state merged --limit 100 --search "merged:>$(LAST_RELEASE_DATE)" --json number,title,author,createdAt --jq '.[] | "* \(.title) by @\(.author.login) in #\(.number)"') && \
+	echo "## $(VERSION) / $(shell date +%Y-%m-%d)" && \
+	echo && \
+	echo "$$MERGED_PRS"
