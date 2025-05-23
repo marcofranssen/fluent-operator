@@ -49,102 +49,69 @@ This page describes the release process and the currently planned schedule for u
 | v3.4.0         | 2025-05-08            | Marco Franssen (GitHub: @marcofranssen) |
 | v3.5.0         | 2025-10-24            | Josh Baird (GitHub: @joshuabaird)       |
 
-### How to cut a new release
+## Operator release process
 
-> This guide is strongly based on the [Prometheus release instructions](https://github.com/prometheus/prometheus/blob/master/RELEASE.md).
+This document describes the process of cutting a new release of Fluent Operator. It is intended for maintainers and contributors who are responsible for managing the release process. Releases use [semantic versioning](https://semver.org/). The actual release is published by a GitHub Actions workflow.
 
-### Branch management and versioning strategy
+### Major/Minor releases
 
-We use [Semantic Versioning](http://semver.org/).
+Releases are cut from the `master` branch of the repository. The release process involves the following steps:
 
-We maintain a separate branch for each minor release, named `release-<major>.<minor>`, e.g. `release-1.1`, `release-2.0`.
+1. Create a PR to prepare the release.
 
-The usual flow is to merge new features and changes into the master branch and to merge bug fixes into the latest release branch. Bug fixes are then merged into master from the latest release branch. The master branch should always contain all commits from the latest release branch.
+   ```shell
+   git checkout master
+   git pull upstream master
+   git checkout -b release-X.Y master
+   ```
 
-If a bug fix got accidentally merged into master, cherry-pick commits have to be created in the latest release branch, which then have to be merged back into master. Try to avoid that situation.
+   This PR should include the following changes:
 
-Maintaining the release branches for older minor releases happens on a best effort basis.
+    * Update the `version` field in the `Chart.yaml` file to the new version number.
+    * Update the `appVersion` field in the `Chart.yaml` file to the new version number.
+    * Update the `CHANGELOG.md` file with a summary of changes since the last release.
+    * Update the `RELEASE.md` file with the new release date and shepherd information.
 
-### Prepare your release
+2. Once the PR is reviewed and approved, merge it into the `master` branch.
 
-For a new major or minor release, work from the `main` branch. For a patch release, work in the branch of the minor release you want to patch (e.g. `release-0.1` if you're releasing `v0.1.1`).
+3. Create a new tag for the release. The tag should follow the format `vX.Y.Z`, where `X` is the major version, `Y` is the minor version, and `Z` is the patch version. For example, for version 1.0.0, the tag should be `v1.0.0`.
 
-Add an entry for the new version to the `CHANGELOG.md` file. Entries in the `CHANGELOG.md` should be in this order:
+### Patch releases
 
-- `[CHANGE]`
-- `[FEATURE]`
-- `[ENHANCEMENT]`
-- `[BUGFIX]`
+Patch releases are created for bug fixes and minor improvements. They should not introduce any breaking changes. The process for creating a patch release is the same as for a major or minor release, but the version number should be incremented in the patch version (e.g., from `v1.0.0` to `v1.0.1`).
 
-Create a PR for the changes to be reviewed.
+1. Create a PR to prepare the patch release.
 
-### Publish the new release
+   ```shell
+   git checkout release-X.Y
+   git pull upstream release-X.Y
+   git checkout -b patch-X.Y.Z release-X.Y
+   ```
 
-For new minor and major releases, create the `release-<major>.<minor>` branch starting at the PR merge commit.
-From now on, all work happens on the `release-<major>.<minor>` branch.
+   Now cherry-pick the commits from the `master` branch that you want to include in the patch release. You can use the `git cherry-pick` command to do this.
 
-Bump the version in the `VERSION` file in the root of the repository.
+   ```shell
+   git cherry-pick <commit-hash>
+   ```
 
-Regenerate setup.yaml based on latest code and then commit the changed bundle.yaml to the `release-<major>.<minor>` branch:
+   Repeat this step for each commit you want to include in the patch release.
 
-```bash
-make manifests
-git add ./
-git commit -s -m "regenerate setup.yaml"
-git push
-```
+   This PR should include the following changes:
 
-Images will be automatically built and pushed whenever code changes or a tag is created. If users want to build images manually, use the following command:
+    * Update the `version` field in the `Chart.yaml` file to the new version number.
+    * Update the `appVersion` field in the `Chart.yaml` file to the new version number.
+    * Update the `CHANGELOG.md` file with a summary of changes since the last release.
+    * Update the `RELEASE.md` file with the new release date and shepherd information.
 
-```bash
-make build-op-amd64 -e FO_IMG=<image of fluent operator>
-docker push <image of fluent operator>
-make build-fb-amd64 -e FB_IMG=<image of fluent bit>
-docker push <image of fluent bit>
-make build-fd-amd64 -e FD_IMG=<image of fluentd>
-docker push <image of fluentd>
-```
-
-Tag the new release with a tag named `v<major>.<minor>.<patch>`, e.g. `v2.1.3`. Note the `v` prefix. You can do the tagging on the commandline:
-
-```bash
-tag="$(< VERSION)"
-git tag -a "${tag}" -m "${tag}"
-git push origin "${tag}"
-```
-
-Commit all the changes.
-
-Finally, create a new release:
-
-- Go to https://github.com/fluent/fluent-operator/releases/new.
-- Associate the new release with the previously pushed tag.
-- Add release notes based on `CHANGELOG.md`.
-- Add file `setup.yaml` from `manifests/setup/setup.yaml` and then click "Publish release".
-
-For patch releases, cherry-pick the commits from the release branch into the master branch.
-
-#### Publish updated Helm chart
-
-This repo includes a "development" chart in the [charts/](./charts/fluent-operator/) directory. For each release, this chart must be published to the [fluent/helm-charts](https://github.com/fluent/helm-charts/tree/main/charts/fluent-operator/) repository which is where Fluent Operators install the chart from. This is currently a manual process. Follow these instructions to update and publish the chart:
-
-- Bump `version` and `appVersion` in the [charts/fluent-operator/Chart.yaml](./charts/fluent-operator/Chart.yaml) file in this repo
-- Bump `version` and `appVersion` in the [charts/fluent-operator/charts/fluent-bit-crds/Chart.yaml](./charts/fluent-operator/charts/fluent-bit-crds/Chart.yaml) and [charts/fluent-operator/charts/fluentd-crds/Chart.yaml](./charts/fluent-operator/charts/fluentd-crds/Chart.yaml) directory
-- Bump the `fluent-bit-crds` and `fluentd-crds` version under `dependencies` in [charts/fluent-operator/Chart.yaml](./charts/fluent-operator/Chart.yaml)
-- Manually "sync" (copy, open a PR) the local [chart](./charts/fluent-operator) to [fluent/helm-charts](https://github.com/fluent/helm-charts/tree/main/charts/fluent-operator/)
-
-## Fluentd/Fluent-bit Images
-
-Fluent Operator uses [custom builds](./cmd/fluent-watcher/README.md) of both Fluentd and Fluent-bit.  These images can (and often should be) be published out-of-band of Fluent Operator releases.
-
-### Fluent-bit
+## FluentBit release process
 
 To publish a new fluent-bit image:
 
 * Execute the [bump-fluent-bit-version](https://github.com/fluent/fluent-operator/actions/workflows/bump-fluent-bit-version.yaml) workflow dispatch to generate a PR to update fluent-bit version references in this repo
-* Merge the PR generated by the [bump-fluent-bit-version](https://github.com/fluent/fluent-operator/actions/workflows/bump-fluent-bit-version.yaml) workflow. (This will [automatically trigger the release](https://github.com/fluent/fluent-operator/blob/master/.github/workflows/build-fluentbit-image.yaml#L4-L8) of the new fluent-bit image)
+* Merge the PR generated by the [bump-fluent-bit-version](https://github.com/fluent/fluent-operator/actions/workflows/bump-fluent-bit-version.yaml) workflow. (This will [automatically trigger the release](https://github.com/fluent/fluent-operator/blob/master/.github/workflows/build-fluentbit-image.yaml#L4-L8) of
+ the new fluent-bit image)
 
-### Fluentd
+### Fluentd release process
 
 To publish a new fluentd image:
 
